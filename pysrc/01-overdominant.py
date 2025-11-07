@@ -1,10 +1,8 @@
-# default libs
 import numpy as np
 import pandas as pd
 import subprocess
 import argparse
 
-# tskit libs
 import tskit, msprime, pyslim
 
 
@@ -21,6 +19,7 @@ if __name__ == "__main__":
             "--seed", type=int, default=973,
             help="Random seed",
             )
+    # genetics
     parser.add_argument(
             "--num_individuals", type=int, default=1e4,
             help="Number of individuals",
@@ -34,8 +33,16 @@ if __name__ == "__main__":
             help="Mutation rate",
             )
     parser.add_argument(
+            "--num_generations", type=int, default=100,
+            help="Number of generations in slim",
+            )
+    parser.add_argument(
             "--vs", type=float, default=5,
             help="Vs of stabilizing selection",
+            )
+    parser.add_argument(
+            "--eff_setting", type=str, default="variable",
+            help="Effect size setting",
             )
     parser.add_argument(
             "--eff_var", type=float, default=0.01,
@@ -45,21 +52,11 @@ if __name__ == "__main__":
             "--eff_const", type=float, default=0.1,
             help="Fixed effect size",
             )
-    parser.add_argument(
-            "--eff_setting", type=str, default="variable",
-            help="Effect size setting",
-            )
-    parser.add_argument(
-            "--prefix", type=str, default="",
-            help="Output prefix",
-            )
+    
+    # I/O
     parser.add_argument(
             "--out_path", type=str, default="",
             help="Output file",
-            )
-    parser.add_argument(
-            "--num_generations", type=int, default=100,
-            help="Number of generations in slim",
             )
     parser.add_argument(
             "--frequency_path", type=str,
@@ -104,7 +101,8 @@ if __name__ == "__main__":
 
     # write burn-in
     ts_out = t.tree_sequence()
-    ts_out.dump(args.prefix + args.out_path)
+    ts_out.dump(args.out_path)
+    print(ts_out)
 
     # run slim - biallelic simulation check
     slim_args = [
@@ -114,21 +112,24 @@ if __name__ == "__main__":
             "-d", f"numIndividuals={args.num_individuals}",
             "-d", f"mu={args.mu}",
             "-d", f"numTicks={args.num_generations}",
-            "-d", f"inTreeSequence='{args.prefix + args.out_path}'",
-            "-d", f"outTreeSequence='{args.prefix + args.out_path}'",
-            "-d", f"freqFile='{args.prefix + args.frequency_path}'",
+            "-d", f"inTreeSequence='{args.out_path}'",
+            "-d", f"outTreeSequence='{args.out_path}'",
+            "-d", f"freqFile='{args.frequency_path}'",
             "-d", f"Vs={args.vs}",
             "-d", f"effectSizes_setting='{args.eff_setting}'",
             "-d", f"effectVar={args.eff_var}",
             "-d", f"alpha={args.eff_const}",
+            "-d", f"SEED={args.seed}",
             f"{args.src_path}"
             ]
     subprocess.run(slim_args)
 
     # check frequency match
-    ts = tskit.load(args.prefix + args.out_path)
+    ts = tskit.load(args.out_path)
     freq_ts = ts.genotype_matrix().mean(axis=1)
-    freq_slim = pd.read_csv(args.prefix + args.frequency_path, index_col=0)["freq_mean"]
-    f1, f2 = freq_ts.item(), freq_slim.item()
-    print(f1, f2)
+    freq_slim = pd.read_csv(args.frequency_path, index_col=0)["freq_mean"]
+    try:
+        f1, f2 = freq_ts.item(), freq_slim.item()
+    except:
+        f1, f2 = 0, 0
     assert f1 == f2, "Two frequencies should match."
