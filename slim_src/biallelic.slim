@@ -1,0 +1,72 @@
+initialize() {
+	initializeTreeSeq();
+
+	initializeMutationType("m1", 0.5, "f", 0.0);
+	m1.convertToSubstitution = F;
+	
+	initializeMutationType("m0", 0.5, "f", 0.0);
+	m0.convertToSubstitution = F;
+
+	initializeGenomicElementType("g1", m0, 1.0);
+	initializeGenomicElement(g1, 0, sequenceLength-1);
+	initializeMutationRate(mu);
+	initializeRecombinationRate(0);
+
+}
+
+1 early() {
+    sim.readFromPopulationFile(inTreeSequence);
+    muts = sim.mutationsOfType(m1);
+    mutPlaceHolder = muts[0];
+    defineGlobal("MUT", rep(mutPlaceHolder, sequenceLength));
+    defineGlobal("MUT_EXIST", rep(0, sequenceLength));
+	for (mut in sim.mutationsOfType(m1)) {
+		MUT[mut.position] = mut;
+        MUT_EXIST[mut.position] = 1;
+	}
+    
+}
+
+mutation(m0) {
+    if (haplosome.containsMarkerMutation(m1, mut.position)) {
+        return T;
+    }     
+	// use an existing mutation in that locus if exists
+	// add a new one to the global variable if it doesn't
+    if (MUT_EXIST[mut.position] == 1) {
+        return MUT[mut.position];
+    } else {
+        mut.setMutationType(m1);
+		MUT[mut.position] = mut;
+        MUT_EXIST[mut.position] = 1;
+        return MUT[mut.position];
+    }
+}
+    
+late() {
+	// all existing mutations should be m1
+	// any m0 mutations are those added on top of m1
+	// these are removed every tick
+	m0muts = sim.mutationsOfType(m0);
+	if (m0muts.length() > 0) {
+		haplosomes = sim.subpopulations.haplosomes;
+		counts = haplosomes.countOfMutationsOfType(m0);
+		hasStacked = haplosomes[counts > 0];
+		for (haplosome in hasStacked) {
+			stacked_m0 = haplosome.mutationsOfType(m0);
+			stackPositions = stacked_m0.position;
+			all_m1 = haplosome.mutationsOfType(m1);
+			s = (match(all_m1.position, stackPositions) >= 0);
+			stacked_m1 = all_m1[s];
+			haplosome.removeMutations(c(stacked_m0, stacked_m1));
+		}
+	}
+}
+
+numTicks late() {
+	log = community.createLogFile(freqFile, logInterval=10);
+	log.addTick();	
+	log.addMeanSDColumns("freq", "sim.mutationFrequencies(NULL, sim.mutationsOfType(m1));");
+	sim.treeSeqOutput(outTreeSequence);
+	sim.simulationFinished();
+}

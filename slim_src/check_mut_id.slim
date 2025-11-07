@@ -1,0 +1,25 @@
+initialize() {
+	initializeMutationType("m1", 0.5, "f", 0.0);
+	m1.convertToSubstitution = F;
+	
+	initializeMutationType("m0", 0.5, "f", 0.0);
+	m0.convertToSubstitution = F;
+
+	initializeGenomicElementType("g1", m0, 1.0);
+	initializeGenomicElement(g1, 0, sequenceLength-1);
+	initializeMutationRate(0);
+	initializeRecombinationRate(0);
+
+}
+
+1 late() {
+	sim.readFromPopulationFile(inTreeSequence);
+}
+
+2 late() {
+	muts = sim.mutationsOfType(m1);
+    print(muts);
+	for (mut in muts) {
+		print("Mutation id is " + mut.id);
+	}
+}
